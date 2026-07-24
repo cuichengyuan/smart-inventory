@@ -15,6 +15,38 @@
             background-color: #f5f5f5;
             padding: 16px;
         }
+        /* 顶部标签导航栏样式 */
+        .tabs-nav {
+            display: flex;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            padding: 4px;
+            margin-bottom: 16px;
+        }
+        .tab-btn {
+            flex: 1;
+            height: 44px;
+            background: none;
+            border: none;
+            font-size: 18px;
+            font-weight: bold;
+            color: #555;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background-color: #fff;
+            color: #007aff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        /* 标签页内容区块控制 */
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
         .container-box {
             background-color: #fff;
             padding: 18px;
@@ -28,7 +60,8 @@
             margin-bottom: 14px;
         }
         .input-group label.title-label {
-            width: 80px;
+            width: auto;
+            margin-right: 8px;
             font-size: 18px;
             color: #111;
             font-weight: 700;
@@ -157,54 +190,110 @@
             font-weight: 500;
             padding: 24px 0;
         }
+        /* 空白页通用样式 */
+        .blank-panel {
+            background-color: #fff;
+            padding: 40px 18px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            text-align: center;
+            color: #888;
+            font-size: 18px;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
 
-    <div class="container-box">
-        <div class="input-group">
-            <label class="title-label">柜号</label>
-            <div class="input-wrapper">
-                <input type="text" id="containerInput" placeholder="可用空格输入多个..." oninput="convertToUpperCase(this)">
-            </div>
-        </div>
-
-        <div class="input-group">
-            <label class="title-label">仓点</label>
-            <div class="code-row-wrapper">
-                <input type="text" id="codeInput" placeholder="可用空格输入多个..." oninput="convertToUpperCase(this)">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="code模糊"> 模糊
-                </label>
-            </div>
-        </div>
-
-        <button type="button" id="queryBtn" class="btn-query" onclick="handleQuery()">查询</button>
+    <!-- 顶部标签导航 -->
+    <div class="tabs-nav">
+        <button class="tab-btn active" onclick="switchTab(0)">找货</button>
+        <button class="tab-btn" onclick="switchTab(1)">转仓</button>
+        <button class="tab-btn" onclick="switchTab(2)">放货</button>
     </div>
 
-    <div class="result-box">
-        <div class="result-title">查询结果 (库存≠0)</div>
-        <div id="resultList">
-            <div class="no-result">暂无查询结果，请输入条件点击查询</div>
+    <!-- 标签一：找货 (原查询系统所有内容) -->
+    <div id="tabContent0" class="tab-content active">
+        <div class="container-box">
+            <div class="input-group">
+                <label class="title-label">柜号</label>
+                <div class="input-wrapper">
+                    <input type="text" id="containerInput" placeholder="" oninput="formatInput(this)">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="title-label">仓点</label>
+                <div class="code-row-wrapper">
+                    <input type="text" id="codeInput" placeholder="" oninput="formatInput(this)">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="code模糊"> 模糊
+                    </label>
+                </div>
+            </div>
+
+            <button type="button" id="queryBtn" class="btn-query" onclick="handleQuery()">查询</button>
         </div>
+
+        <div class="result-box">
+            <div class="result-title" id="resultTitle">查询结果（0条）</div>
+            <div id="resultList">
+                <div class="no-result">暂无查询结果，请输入条件点击查询</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 标签二：转仓 (暂时空白) -->
+    <div id="tabContent1" class="tab-content">
+        <div class="blank-panel">转仓功能开发中...</div>
+    </div>
+
+    <!-- 标签三：放货 (暂时空白) -->
+    <div id="tabContent2" class="tab-content">
+        <div class="blank-panel">放货功能开发中...</div>
     </div>
 
     <script>
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyb8LkK6MFSwGBr5tpmh-1BRibRIl_SnfTuwlyV0Jw0k6XQqYDCph4T3Oy6FfV0Gy0/exec";
 
-        function convertToUpperCase(inputElement) {
-            inputElement.value = inputElement.value.toUpperCase();
+        // 标签切换函数
+        function switchTab(index) {
+            const buttons = document.querySelectorAll('.tab-btn');
+            const contents = document.querySelectorAll('.tab-content');
+
+            buttons.forEach((btn, idx) => {
+                if (idx === index) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            contents.forEach((content, idx) => {
+                if (idx === index) {
+                    content.classList.add('active');
+                } else {
+                    content.classList.remove('active');
+                }
+            });
+        }
+
+        function formatInput(inputElement) {
+            let val = inputElement.value.toUpperCase();
+            val = val.replace(/\s+/g, ' ');
+            inputElement.value = val;
         }
 
         async function handleQuery() {
-            const containerRaw = document.getElementById('containerInput').value.trim().toUpperCase();
-            const containerVals = containerRaw ? containerRaw.split(/\s+/) : [];
+            const containerRaw = document.getElementById('containerInput').value.trim().replace(/\s+/g, ' ');
+            const containerVals = containerRaw ? containerRaw.split(' ') : [];
 
-            const codeRaw = document.getElementById('codeInput').value.trim().toUpperCase();
-            const codeVals = codeRaw ? codeRaw.split(/\s+/) : [];
+            const codeRaw = document.getElementById('codeInput').value.trim().replace(/\s+/g, ' ');
+            const codeVals = codeRaw ? codeRaw.split(' ') : [];
             const codeFuzzy = document.getElementById('code模糊').checked;
             
             const resultList = document.getElementById('resultList');
+            const resultTitle = document.getElementById('resultTitle');
             const queryBtn = document.getElementById('queryBtn');
 
             queryBtn.disabled = true;
@@ -257,6 +346,8 @@
 
                     return matchContainer && matchCode;
                 });
+
+                resultTitle.innerText = `查询结果（${filtered.length}条）`;
 
                 if (filtered.length === 0) {
                     resultList.innerHTML = `<div class="no-result">没有找到符合条件的非零库存记录</div>`;
