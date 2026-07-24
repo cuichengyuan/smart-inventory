@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>库存查询系统</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 16px;
+        }
+        .container-box {
+            background-color: #fff;
+            padding: 18px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 16px;
+        }
+        .input-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .input-group label.title-label {
+            width: 80px;
+            font-size: 18px;
+            color: #111;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .input-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .input-group input[type="text"] {
+            flex: 1;
+            height: 48px;
+            padding: 0 14px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: bold;
+            outline: none;
+            text-transform: uppercase;
+            width: 100%;
+        }
+        .input-group input[type="text"]:focus {
+            border-color: #007aff;
+        }
+        .code-row-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #codeInput {
+            flex: 1;
+            min-width: 0;
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .checkbox-label input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .btn-query {
+            width: 100%;
+            height: 50px;
+            background-color: #007aff;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        .btn-query:active {
+            background-color: #005bb5;
+        }
+        .btn-query:disabled {
+            background-color: #9ac0f5;
+            cursor: not-allowed;
+        }
+        .result-box {
+            background-color: #fff;
+            padding: 18px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .result-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 14px;
+            color: #111;
+        }
+        .result-item {
+            padding: 14px 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+        .result-item:active {
+            background-color: #f0f0f0;
+        }
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        .row-top {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007aff;
+            display: flex;
+            justify-content: space-between;
+        }
+        .row-bottom {
+            font-size: 18px;
+            color: #222;
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            align-items: center;
+        }
+        .loc-text {
+            color: #007aff;
+            background-color: #eef5ff;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .no-result {
+            text-align: center;
+            color: #555;
+            font-size: 17px;
+            font-weight: 500;
+            padding: 24px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container-box">
+        <div class="input-group">
+            <label class="title-label">柜号</label>
+            <div class="input-wrapper">
+                <input type="text" id="containerInput" placeholder="可用空格输入多个..." oninput="convertToUpperCase(this)">
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label class="title-label">仓点</label>
+            <div class="code-row-wrapper">
+                <input type="text" id="codeInput" placeholder="可用空格输入多个..." oninput="convertToUpperCase(this)">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="code模糊"> 模糊
+                </label>
+            </div>
+        </div>
+
+        <button type="button" id="queryBtn" class="btn-query" onclick="handleQuery()">查询</button>
+    </div>
+
+    <div class="result-box">
+        <div class="result-title">查询结果 (库存≠0)</div>
+        <div id="resultList">
+            <div class="no-result">暂无查询结果，请输入条件点击查询</div>
+        </div>
+    </div>
+
+    <script>
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyb8LkK6MFSwGBr5tpmh-1BRibRIl_SnfTuwlyV0Jw0k6XQqYDCph4T3Oy6FfV0Gy0/exec";
+
+        function convertToUpperCase(inputElement) {
+            inputElement.value = inputElement.value.toUpperCase();
+        }
+
+        async function handleQuery() {
+            const containerRaw = document.getElementById('containerInput').value.trim().toUpperCase();
+            const containerVals = containerRaw ? containerRaw.split(/\s+/) : [];
+
+            const codeRaw = document.getElementById('codeInput').value.trim().toUpperCase();
+            const codeVals = codeRaw ? codeRaw.split(/\s+/) : [];
+            const codeFuzzy = document.getElementById('code模糊').checked;
+            
+            const resultList = document.getElementById('resultList');
+            const queryBtn = document.getElementById('queryBtn');
+
+            queryBtn.disabled = true;
+            queryBtn.innerText = '正在查询...';
+            resultList.innerHTML = `<div class="no-result">正在从 Google 表格获取库存数据...</div>`;
+
+            try {
+                const response = await fetch(WEB_APP_URL + '?action=getData');
+                const textResult = await response.text();
+                
+                let inventoryData;
+                try {
+                    inventoryData = JSON.parse(textResult);
+                } catch (e) {
+                    alert("后台返回数据格式错误: " + textResult.substring(0, 150));
+                    throw new Error("后台未返回有效的 JSON 数据");
+                }
+
+                if (!Array.isArray(inventoryData)) {
+                    throw new Error("后端返回的数据格式不正确（不是数组）");
+                }
+
+                const filtered = inventoryData.filter(item => {
+                    const isBalanceValid = Number(item.balance) > 0;
+                    if (!isBalanceValid) return false;
+
+                    const itemContainer = String(item.container || '').toUpperCase();
+                    let matchContainer = true;
+                    if (containerVals.length > 0) {
+                        matchContainer = containerVals.some(val => itemContainer.includes(val));
+                    }
+
+                    const rawItemCode = String(item.code || '').toUpperCase();
+                    let matchCode = true;
+                    if (codeVals.length > 0) {
+                        let effectiveItemCode = rawItemCode;
+                        const fromIndex = rawItemCode.indexOf("FROM");
+                        if (fromIndex !== -1) {
+                            effectiveItemCode = rawItemCode.substring(0, fromIndex).trim();
+                        }
+
+                        matchCode = codeVals.some(val => {
+                            if (codeFuzzy) {
+                                return effectiveItemCode.includes(val);
+                            } else {
+                                return effectiveItemCode === val;
+                            }
+                        });
+                    }
+
+                    return matchContainer && matchCode;
+                });
+
+                if (filtered.length === 0) {
+                    resultList.innerHTML = `<div class="no-result">没有找到符合条件的非零库存记录</div>`;
+                    return;
+                }
+
+                filtered.sort((a, b) => {
+                    const locA = String(a.loc || '').toUpperCase();
+                    const locB = String(b.loc || '').toUpperCase();
+                    if (locA < locB) return -1;
+                    if (locA > locB) return 1;
+                    return 0;
+                });
+
+                let html = '';
+                filtered.forEach(item => {
+                    const safeSystemId = item.systemId || '';
+                    const safeContainer = (item.container || '').replace(/"/g, '&quot;');
+                    const safeCode = (item.code || '').replace(/"/g, '&quot;');
+                    const safeLoc = (item.loc || '').replace(/"/g, '&quot;');
+
+                    html += `
+                        <div class="result-item" 
+                             data-id="${safeSystemId}"
+                             data-container="${safeContainer}" 
+                             data-code="${safeCode}" 
+                             data-loc="${safeLoc}"
+                             ondblclick="triggerEditLoc(this)">
+                            <div class="row-top">
+                                <span>${item.container || ''}</span>
+                                <span>${item.code || ''}</span>
+                            </div>
+                            <div class="row-bottom">
+                                <span class="loc-text">LOC: ${item.loc || ''}</span>
+                                <span>Qty: ${item.balance}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                resultList.innerHTML = html;
+
+            } catch (error) {
+                console.error("查询出错:", error);
+                alert("查询捕获到错误: " + error.message);
+                resultList.innerHTML = `<div class="no-result" style="color: red;">查询失败: ${error.message}</div>`;
+            } finally {
+                queryBtn.disabled = false;
+                queryBtn.innerText = '查询';
+            }
+        }
+
+        async function triggerEditLoc(element) {
+            const systemId = element.getAttribute('data-id');
+            const container = element.getAttribute('data-container');
+            const code = element.getAttribute('data-code');
+            const oldLoc = element.getAttribute('data-loc');
+
+            const newLoc = prompt(`请输入新库位\n柜号: ${container}\n代码: ${code}`, oldLoc);
+            if (newLoc === null) return;
+
+            const trimmedLoc = newLoc.trim().toUpperCase();
+            if (trimmedLoc === oldLoc) return;
+
+            const locSpan = element.querySelector('.loc-text');
+            const originalText = locSpan.innerText;
+            locSpan.innerText = `LOC: 保存中...`;
+
+            try {
+                const updateUrl = `${WEB_APP_URL}?action=updateLoc&systemId=${encodeURIComponent(systemId)}&newLoc=${encodeURIComponent(trimmedLoc)}`;
+                
+                const response = await fetch(updateUrl);
+                const result = await response.json();
+
+                if (result.status === "success") {
+                    element.setAttribute('data-loc', trimmedLoc);
+                    locSpan.innerText = `LOC: ${trimmedLoc}`;
+                    alert("LOC 修改成功并已写入表格！");
+                } else {
+                    throw new Error(result.message || "修改失败");
+                }
+
+            } catch (error) {
+                console.error("保存失败:", error);
+                locSpan.innerText = originalText;
+                alert("保存失败: " + error.message);
+            }
+        }
+    </script>
+
+</body>
+</html>
