@@ -59,9 +59,14 @@
             align-items: center;
             margin-bottom: 14px;
         }
+        .input-group.column {
+            flex-direction: column;
+            align-items: stretch;
+        }
         .input-group label.title-label {
             width: auto;
             margin-right: 8px;
+            margin-bottom: 6px;
             font-size: 18px;
             color: #111;
             font-weight: 700;
@@ -73,10 +78,10 @@
             align-items: center;
             gap: 10px;
         }
-        .input-group input[type="text"] {
+        .input-group input[type="text"],
+        .input-group textarea {
             flex: 1;
-            height: 48px;
-            padding: 0 14px;
+            padding: 12px 14px;
             border: 1px solid #ccc;
             border-radius: 6px;
             font-size: 18px;
@@ -85,7 +90,12 @@
             text-transform: uppercase;
             width: 100%;
         }
-        .input-group input[type="text"]:focus {
+        .input-group textarea {
+            resize: vertical;
+            font-family: inherit;
+        }
+        .input-group input[type="text"]:focus,
+        .input-group textarea:focus {
             border-color: #007aff;
         }
         .code-row-wrapper {
@@ -201,6 +211,20 @@
             font-size: 18px;
             font-weight: 500;
         }
+        /* 转仓任务专用结果样式 */
+        .transfer-row {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .transfer-row:last-child {
+            border-bottom: none;
+        }
     </style>
 </head>
 <body>
@@ -212,7 +236,7 @@
         <button class="tab-btn" onclick="switchTab(2)">放货</button>
     </div>
 
-    <!-- 标签一：找货 (原查询系统所有内容) -->
+    <!-- 标签一：找货 -->
     <div id="tabContent0" class="tab-content active">
         <div class="container-box">
             <div class="input-group">
@@ -243,12 +267,25 @@
         </div>
     </div>
 
-    <!-- 标签二：转仓 (暂时空白) -->
+    <!-- 标签二：转仓 -->
     <div id="tabContent1" class="tab-content">
-        <div class="blank-panel">转仓功能开发中...</div>
+        <div class="container-box">
+            <div class="input-group column">
+                <label class="title-label">转仓内容</label>
+                <textarea rows="5" id="transferInput" placeholder="请输入或粘贴内容..." oninput="formatInput(this)"></textarea>
+            </div>
+            <button type="button" id="transferBtn" class="btn-query" onclick="handleTransfer()">转化任务</button>
+        </div>
+
+        <div class="result-box">
+            <div class="result-title" id="transferResultTitle">转仓任务（0条）</div>
+            <div id="transferResultList">
+                <div class="no-result">暂无转化任务，请输入内容点击转化</div>
+            </div>
+        </div>
     </div>
 
-    <!-- 标签三：放货 (暂时空白) -->
+    <!-- 标签三：放货 -->
     <div id="tabContent2" class="tab-content">
         <div class="blank-panel">放货功能开发中...</div>
     </div>
@@ -433,6 +470,125 @@
                 console.error("保存失败:", error);
                 locSpan.innerText = originalText;
                 alert("保存失败: " + error.message);
+            }
+        }
+
+        // 转仓任务解析、联动表格查询（支持带连字符的原仓点，如 HOLD-3）
+        async function handleTransfer() {
+            const text = document.getElementById('transferInput').value.trim();
+            const resultList = document.getElementById('transferResultList');
+            const resultTitle = document.getElementById('transferResultTitle');
+            const transferBtn = document.getElementById('transferBtn');
+
+            if (!text) {
+                alert("请输入需要转仓的内容");
+                return;
+            }
+
+            transferBtn.disabled = true;
+            transferBtn.innerText = '正在转化并匹配表格...';
+            resultList.innerHTML = `<div class="no-result">正在从 Google 表格获取数据并匹配原仓点库位和数量...</div>`;
+
+            try {
+                const response = await fetch(WEB_APP_URL + '?action=getData');
+                const textResult = await response.text();
+                let inventoryData;
+                try {
+                    inventoryData = JSON.parse(textResult);
+                } catch (e) {
+                    throw new Error("后台返回的数据格式错误");
+                }
+
+                let cleanText = text.replace(/\s+/g, ' ');
+                let parsedTasks = [];
+                let seenPairs = new Set();
+
+                let segments = cleanText.split(/ACCORDING\s+TO/gi);
+
+                for (let i = 0; i < segments.length - 1; i++) {
+                    let currentPart = segments[i];
+                    let nextPart = segments[i + 1];
+
+                    let nextTokens = nextPart.trim().split(' ');
+                    let targetWarehouse = nextTokens[0] ? nextTokens[0].toUpperCase() : '';
+
+                    // 兼容带连字符的仓点（如 HOLD-3）
+                    let regex = /([A-Z0-9\-]+)\s+([A-Z0-9\-]+)/gi;
+                    let match;
+                    while ((match = regex.exec(currentPart)) !== null) {
+                        let container = match[1].toUpperCase();
+                        let warehouse = match[2].toUpperCase();
+
+                        let ignoreWords = ['ACCORDING', 'TO', '出库', 'SHEILA', 'SAMUEL', 'SMART'];
+                        if (ignoreWords.includes(container) || ignoreWords.includes(warehouse)) continue;
+                        if (container.length < 3) continue;
+
+                        let key = `${container}_${warehouse}_${targetWarehouse}`;
+                        if (!seenPairs.has(key)) {
+                            seenPairs.add(key);
+                            parsedTasks.push({
+                                container: container,
+                                oldWarehouse: warehouse, // 记录原仓点（支持 HOLD-3）
+                                newWarehouse: targetWarehouse
+                            });
+                        }
+                    }
+
+                    nextTokens.shift();
+                    segments[i + 1] = nextTokens.join(' ');
+                }
+
+                resultTitle.innerText = `转仓任务（${parsedTasks.length}条）`;
+
+                if (parsedTasks.length === 0) {
+                    resultList.innerHTML = `<div class="no-result">未能解析出有效的转仓任务，请检查输入格式</div>`;
+                    transferBtn.disabled = false;
+                    transferBtn.innerText = '转化任务';
+                    return;
+                }
+
+                let html = '';
+                parsedTasks.forEach(task => {
+                    // 严格使用“原仓点”（task.oldWarehouse）去匹配表格中的第四列（Code）
+                    let matches = inventoryData.filter(item => {
+                        let itemContainer = String(item.container || '').toUpperCase();
+                        let itemCode = String(item.code || '').toUpperCase();
+                        let balance = Number(item.balance);
+
+                        // O列数量为0或非数字的跳过
+                        if (isNaN(balance) || balance <= 0) return false;
+
+                        // 柜号匹配
+                        let matchC = itemContainer.includes(task.container);
+                        // 仓点匹配：只匹配原仓点
+                        let matchW = itemCode === task.oldWarehouse || itemCode.startsWith(task.oldWarehouse + ' ');
+
+                        return matchC && matchW;
+                    });
+
+                    let suffix = '';
+                    if (matches.length > 0) {
+                        let parts = matches.map(m => {
+                            let loc = m.loc || '';
+                            let qty = m.balance || 0;
+                            return `${loc}，${qty}`;
+                        });
+                        suffix = `（${parts.join('；')}）`;
+                    }
+
+                    let lineText = `${task.container} ${task.newWarehouse} FROM ${task.oldWarehouse}${suffix}`;
+                    html += `<div class="transfer-row"><span>${lineText}</span></div>`;
+                });
+
+                resultList.innerHTML = html;
+
+            } catch (error) {
+                console.error("转化出错:", error);
+                alert("转化时发生错误: " + error.message);
+                resultList.innerHTML = `<div class="no-result" style="color: red;">转化失败: ${error.message}</div>`;
+            } finally {
+                transferBtn.disabled = false;
+                transferBtn.innerText = '转化任务';
             }
         }
     </script>
