@@ -225,6 +225,71 @@
         .transfer-row:last-child {
             border-bottom: none;
         }
+
+        /* 自定义弹窗样式 */
+        #customModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            width: 320px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .modal-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #333;
+        }
+        .modal-info {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 12px;
+        }
+        .modal-input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+        .modal-checkboxes {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .modal-btns {
+            display: flex;
+            gap: 10px;
+        }
+        .modal-btns button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-cancel {
+            background-color: #e0e0e0;
+            color: #333;
+        }
+        .btn-confirm {
+            background-color: #007aff;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -290,8 +355,32 @@
         <div class="blank-panel">放货功能开发中...</div>
     </div>
 
+    <!-- 自定义修改 LOC / 状态弹窗 -->
+    <div id="customModal">
+        <div class="modal-card">
+            <div class="modal-title">修改库存信息</div>
+            <div class="modal-info" id="modalInfoText">柜号: - | 代码: -</div>
+            <input type="text" id="modalLocInput" class="modal-input" placeholder="输入新库位 LOC">
+            <div class="modal-checkboxes">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="modalReleaseCheck" onchange="handleModalCheckboxChange('release')"> Release
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="modalHoldCheck" onchange="handleModalCheckboxChange('hold')"> HOLD
+                </label>
+            </div>
+            <div class="modal-btns">
+                <button type="button" class="btn-cancel" onclick="closeCustomModal(false)">取消</button>
+                <button type="button" class="btn-confirm" onclick="closeCustomModal(true)">确定</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyb8LkK6MFSwGBr5tpmh-1BRibRIl_SnfTuwlyV0Jw0k6XQqYDCph4T3Oy6FfV0Gy0/exec";
+
+        let currentEditingElement = null;
+        let modalResolveCallback = null;
 
         // 标签切换函数
         function switchTab(index) {
@@ -436,39 +525,112 @@
             }
         }
 
+        // 弹窗互斥逻辑（可选：Release 与 HOLD 只能选其一）
+        function handleModalCheckboxChange(type) {
+            const releaseCheck = document.getElementById('modalReleaseCheck');
+            const holdCheck = document.getElementById('modalHoldCheck');
+            if (type === 'release' && releaseCheck.checked) {
+                holdCheck.checked = false;
+            } else if (type === 'hold' && holdCheck.checked) {
+                releaseCheck.checked = false;
+            }
+        }
+
+        function showCustomModal(container, code, oldLoc) {
+            return new Promise((resolve) => {
+                modalResolveCallback = resolve;
+                document.getElementById('modalInfoText').innerText = `柜号: ${container} | 代码: ${code}`;
+                const locInput = document.getElementById('modalLocInput');
+                locInput.value = oldLoc;
+                
+                // 初始化复选框状态：都不勾选
+                document.getElementById('modalReleaseCheck').checked = false;
+                document.getElementById('modalHoldCheck').checked = false;
+
+                document.getElementById('customModal').style.display = 'flex';
+                locInput.focus();
+            });
+        }
+
+        function closeCustomModal(isConfirm) {
+            document.getElementById('customModal').style.display = 'none';
+            if (modalResolveCallback) {
+                if (isConfirm) {
+                    modalResolveCallback({
+                        confirmed: true,
+                        newLoc: document.getElementById('modalLocInput').value.trim().toUpperCase(),
+                        isRelease: document.getElementById('modalReleaseCheck').checked,
+                        isHold: document.getElementById('modalHoldCheck').checked
+                    });
+                } else {
+                    modalResolveCallback({ confirmed: false });
+                }
+                modalResolveCallback = null;
+            }
+        }
+
         async function triggerEditLoc(element) {
             const systemId = element.getAttribute('data-id');
             const container = element.getAttribute('data-container');
             const code = element.getAttribute('data-code');
             const oldLoc = element.getAttribute('data-loc');
 
-            const newLoc = prompt(`请输入新库位\n柜号: ${container}\n代码: ${code}`, oldLoc);
-            if (newLoc === null) return;
+            // 唤起自定义弹窗
+            const modalResult = await showCustomModal(container, code, oldLoc);
+            if (!modalResult.confirmed) return;
 
-            const trimmedLoc = newLoc.trim().toUpperCase();
-            if (trimmedLoc === oldLoc) return;
+            const trimmedLoc = modalResult.newLoc;
+            const isRelease = modalResult.isRelease;
+            const isHold = modalResult.isHold;
+
+            // 处理 Code 逻辑
+            let newCode = code;
+            // 正则检查是否包含 -HOLD（忽略大小写，兼容类似 -HOLD, -HOLD-3 等变体，或者按需精确匹配）
+            const hasHoldWord = /-HOLD/i.test(code);
+
+            if (isRelease) {
+                // 如果选了 Release：有 "-HOLD" 的话去掉
+                if (hasHoldWord) {
+                    newCode = code.replace(/-HOLD/gi, '').trim();
+                }
+            } else if (isHold) {
+                // 如果选了 HOLD：没有 "-HOLD" 的话在末尾增加
+                if (!hasHoldWord) {
+                    newCode = (code ? code + ' ' : '') + '-HOLD';
+                }
+            }
+
+            // 判断 LOC 和 Code 是否有实际变化
+            if (trimmedLoc === oldLoc && newCode === code) return;
 
             const locSpan = element.querySelector('.loc-text');
-            const originalText = locSpan.innerText;
+            const codeSpan = element.querySelector('.row-top span:nth-child(2)');
+            const originalLocText = locSpan.innerText;
+            const originalCodeText = codeSpan ? codeSpan.innerText : '';
+
             locSpan.innerText = `LOC: 保存中...`;
 
             try {
-                const updateUrl = `${WEB_APP_URL}?action=updateLoc&systemId=${encodeURIComponent(systemId)}&newLoc=${encodeURIComponent(trimmedLoc)}`;
+                // 注意：如果您的后端需要接收新的 code，请确保后端也支持接收 &newCode=xxx 参数并更新对应单元格
+                const updateUrl = `${WEB_APP_URL}?action=updateLoc&systemId=${encodeURIComponent(systemId)}&newLoc=${encodeURIComponent(trimmedLoc)}&newCode=${encodeURIComponent(newCode)}`;
                 
                 const response = await fetch(updateUrl);
                 const result = await response.json();
 
                 if (result.status === "success") {
                     element.setAttribute('data-loc', trimmedLoc);
+                    element.setAttribute('data-code', newCode);
                     locSpan.innerText = `LOC: ${trimmedLoc}`;
-                    alert("LOC 修改成功并已写入表格！");
+                    if (codeSpan) codeSpan.innerText = newCode;
+                    alert("信息修改成功并已写入表格！");
                 } else {
                     throw new Error(result.message || "修改失败");
                 }
 
             } catch (error) {
                 console.error("保存失败:", error);
-                locSpan.innerText = originalText;
+                locSpan.innerText = originalLocText;
+                if (codeSpan) codeSpan.innerText = originalCodeText;
                 alert("保存失败: " + error.message);
             }
         }
@@ -512,7 +674,6 @@
                     let nextTokens = nextPart.trim().split(' ');
                     let targetWarehouse = nextTokens[0] ? nextTokens[0].toUpperCase() : '';
 
-                    // 兼容带连字符的仓点（如 HOLD-3）
                     let regex = /([A-Z0-9\-]+)\s+([A-Z0-9\-]+)/gi;
                     let match;
                     while ((match = regex.exec(currentPart)) !== null) {
@@ -528,7 +689,7 @@
                             seenPairs.add(key);
                             parsedTasks.push({
                                 container: container,
-                                oldWarehouse: warehouse, // 记录原仓点（支持 HOLD-3）
+                                oldWarehouse: warehouse, 
                                 newWarehouse: targetWarehouse
                             });
                         }
@@ -549,18 +710,14 @@
 
                 let html = '';
                 parsedTasks.forEach(task => {
-                    // 严格使用“原仓点”（task.oldWarehouse）去匹配表格中的第四列（Code）
                     let matches = inventoryData.filter(item => {
                         let itemContainer = String(item.container || '').toUpperCase();
                         let itemCode = String(item.code || '').toUpperCase();
                         let balance = Number(item.balance);
 
-                        // O列数量为0或非数字的跳过
                         if (isNaN(balance) || balance <= 0) return false;
 
-                        // 柜号匹配
                         let matchC = itemContainer.includes(task.container);
-                        // 仓点匹配：只匹配原仓点
                         let matchW = itemCode === task.oldWarehouse || itemCode.startsWith(task.oldWarehouse + ' ');
 
                         return matchC && matchW;
