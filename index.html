@@ -200,7 +200,6 @@
             font-weight: 500;
             padding: 24px 0;
         }
-        /* 空白页通用样式 */
         .blank-panel {
             background-color: #fff;
             padding: 40px 18px;
@@ -211,7 +210,6 @@
             font-size: 18px;
             font-weight: 500;
         }
-        /* 转仓任务专用结果样式 */
         .transfer-row {
             font-size: 18px;
             font-weight: bold;
@@ -226,7 +224,7 @@
             border-bottom: none;
         }
 
-        /* 自定义弹窗样式（字体加大优化） */
+        /* 自定义弹窗样式 */
         #customModal {
             display: none;
             position: fixed;
@@ -271,7 +269,18 @@
         .modal-checkboxes {
             display: flex;
             gap: 24px;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
+        }
+        /* 推荐库位样式 */
+        .modal-recommend {
+            font-size: 16px;
+            font-weight: bold;
+            color: #d9534f;
+            background-color: #fdf7f7;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px dashed #d9534f;
         }
         .modal-btns {
             display: flex;
@@ -373,6 +382,8 @@
                     <input type="checkbox" id="modalHoldCheck" onchange="handleModalCheckboxChange('hold')"> HOLD
                 </label>
             </div>
+            <!-- 推荐库位展示区域 -->
+            <div class="modal-recommend" id="modalRecommendText">推荐库位：计算中...</div>
             <div class="modal-btns">
                 <button type="button" class="btn-cancel" onclick="closeCustomModal(false)">取消</button>
                 <button type="button" class="btn-confirm" onclick="closeCustomModal(true)">确定</button>
@@ -386,7 +397,6 @@
         let currentEditingElement = null;
         let modalResolveCallback = null;
 
-        // 标签切换函数
         function switchTab(index) {
             const buttons = document.querySelectorAll('.tab-btn');
             const contents = document.querySelectorAll('.tab-content');
@@ -529,7 +539,6 @@
             }
         }
 
-        // 弹窗互斥逻辑（Release 与 HOLD 只能选其一）
         function handleModalCheckboxChange(type) {
             const releaseCheck = document.getElementById('modalReleaseCheck');
             const holdCheck = document.getElementById('modalHoldCheck');
@@ -540,16 +549,58 @@
             }
         }
 
-        function showCustomModal(container, code, oldLoc) {
-            return new Promise((resolve) => {
+        async function showCustomModal(container, code, oldLoc) {
+            return new Promise(async (resolve) => {
                 modalResolveCallback = resolve;
                 document.getElementById('modalInfoText').innerText = `柜号: ${container}\n代码: ${code}`;
                 const locInput = document.getElementById('modalLocInput');
                 locInput.value = oldLoc;
                 
-                // 初始化复选框状态：都不勾选
                 document.getElementById('modalReleaseCheck').checked = false;
                 document.getElementById('modalHoldCheck').checked = false;
+                
+                // 计算并展示推荐库位
+                const recommendBox = document.getElementById('modalRecommendText');
+                recommendBox.innerText = "推荐库位：计算中...";
+
+                try {
+                    let cleanCode = code.toUpperCase();
+                    cleanCode = cleanCode.replace(/-HOLD/gi, '').trim();
+                    const fromIdx = cleanCode.indexOf("FROM");
+                    if (fromIdx !== -1) {
+                        cleanCode = cleanCode.substring(0, fromIdx).trim();
+                    }
+
+                    const response = await fetch(WEB_APP_URL + '?action=getLocationRec');
+                    const textResult = await response.text();
+                    let recData = JSON.parse(textResult);
+
+                    if (Array.isArray(recData)) {
+                        let matchedRecs = recData.filter(row => {
+                            const rowCode = String(row.code || row.col1 || '').toUpperCase();
+                            return rowCode === cleanCode;
+                        });
+
+                        matchedRecs.sort((a, b) => {
+                            const valA = Number(a.val || a.col4 || 0);
+                            const valB = Number(b.val || b.col4 || 0);
+                            return valB - valA;
+                        });
+
+                        let topLocations = matchedRecs.slice(0, 3).map(r => r.location || r.col2).filter(Boolean);
+
+                        if (topLocations.length > 0) {
+                            recommendBox.innerText = `推荐库位：${topLocations.join('、')}`;
+                        } else {
+                            recommendBox.innerText = `推荐库位：暂无匹配数据`;
+                        }
+                    } else {
+                        recommendBox.innerText = `推荐库位：无有效数据`;
+                    }
+                } catch (e) {
+                    console.error("获取推荐库位失败", e);
+                    recommendBox.innerText = `推荐库位：获取失败`;
+                }
 
                 document.getElementById('customModal').style.display = 'flex';
                 locInput.focus();
@@ -586,7 +637,6 @@
             const isRelease = modalResult.isRelease;
             const isHold = modalResult.isHold;
 
-            // 处理 Code 逻辑
             let newCode = code;
             const hasHoldWord = /-HOLD/i.test(code);
 
@@ -633,7 +683,6 @@
             }
         }
 
-        // 转仓任务解析、联动表格查询
         async function handleTransfer() {
             const text = document.getElementById('transferInput').value.trim();
             const resultList = document.getElementById('transferResultList');
