@@ -592,14 +592,14 @@
                         if (topLocations.length > 0) {
                             recommendBox.innerText = `推荐库位：${topLocations.join('、')}`;
                         } else {
-                            recommendBox.innerText = `推荐库位：暂无匹配数据`;
+                            recommendBox.innerText = `推荐库位：暂无推荐库位`;
                         }
                     } else {
-                        recommendBox.innerText = `推荐库位：无有效数据`;
+                        recommendBox.innerText = `推荐库位：暂无推荐库位`;
                     }
                 } catch (e) {
                     console.error("获取推荐库位失败", e);
-                    recommendBox.innerText = `推荐库位：获取失败`;
+                    recommendBox.innerText = `推荐库位：暂无推荐库位`;
                 }
 
                 document.getElementById('customModal').style.display = 'flex';
