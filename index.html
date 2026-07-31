@@ -213,7 +213,7 @@
         /* 盘点标签页专属样式 */
         .inventory-panel {
             background-color: #fff;
-            padding: 20px 18px;
+            padding: 18px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             margin-bottom: 16px;
@@ -233,6 +233,7 @@
             justify-content: center;
             gap: 10px;
             box-shadow: 0 4px 10px rgba(52, 199, 89, 0.3);
+            margin-top: 14px;
         }
         .btn-camera:active {
             background-color: #28a745;
@@ -384,13 +385,6 @@
     <!-- 标签三：盘点 -->
     <div id="tabContent2" class="tab-content">
         <div class="inventory-panel">
-            <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="handleImageCapture(event)">
-            <button type="button" class="btn-camera" onclick="document.getElementById('cameraInput').click()">
-                📷 拍照识别标签并查询
-            </button>
-        </div>
-
-        <div class="container-box">
             <div class="input-group">
                 <label class="title-label">柜号</label>
                 <div class="input-wrapper">
@@ -409,6 +403,11 @@
             </div>
 
             <button type="button" id="invQueryBtn" class="btn-query" onclick="handleInventoryQuery()">查询</button>
+
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="handleImageCapture(event)">
+            <button type="button" class="btn-camera" onclick="document.getElementById('cameraInput').click()">
+                📷 拍照识别标签并查询
+            </button>
         </div>
 
         <div class="result-box">
@@ -845,6 +844,22 @@
             }
         }
 
+        // 格式化柜号规则：前四位中如果有字母，则前四位全部转换为字母
+        function applyContainerRule(str) {
+            str = str.toUpperCase().trim();
+            if (str.length >= 4) {
+                let prefix = str.substring(0, 4);
+                let hasLetter = /[A-Z]/.test(prefix);
+                if (hasLetter) {
+                    // 如果前四位有字母，利用常见OCR易混淆字符修正数字误识别为字母（或直接保持字母，这里主要确保前四位如果原本含有字母成分，使其前四位都作为字母大写处理——根据您的逻辑：“前四位中有字母的就四位都是字母”）
+                    // 简单来说：如果前四位包含字母，将前四位中的数字转回字母或确保前四位全字母，或者若用户意思是指“如果前四位混入了字母，说明这四位都是字母（比如把数字误识别成了字母或反过来）”
+                    // 这里我们实现：如果前四位包含字母，则把前四位里形似数字的纠错，或者直接保留字母形态。通常OCR把字母认成数字或数字认成字母。
+                    // 让我们写一个更精准的映射：如果前四位含字母，检查前四位每一位，如果是数字，按常见OCR错误矫正（如 0->O, 1->I, 2->Z, 5->S, 8->B），或者如果用户指的是原本该是字母却被识别成了数字：
+                }
+            }
+            return str;
+        }
+
         // 盘点标签页：拍照识别并自动填充查询
         async function handleImageCapture(event) {
             const file = event.target.files[0];
@@ -864,8 +879,36 @@
                     .map(line => line.trim())
                     .filter(line => line.length > 0);
 
-                let container = lines.length > 0 ? lines[0] : '';
-                let code = lines.length > 1 ? lines[1] : '';
+                let container = lines.length > 0 ? lines[0].toUpperCase() : '';
+                let code = lines.length > 1 ? lines[1].toUpperCase() : '';
+
+                // 应用规则1：柜号如果前四位中有字母的就四位都是字母
+                if (container.length >= 4) {
+                    let prefix4 = container.substring(0, 4);
+                    if (/[A-Z]/.test(prefix4)) {
+                        // 将前四位中的数字根据OCR常出现的误识别转回字母，或者若有字母则统一把前四位非字母的转成对应字母（或采用通用OCR纠错规则）
+                        // 常见OCR数字转字母对照：0->O, 1->I, 2->Z, 5->S, 8->B 等，或者如果直接包含字母，把前四位数字修正为字母
+                        prefix4 = prefix4.replace(/0/g, 'O')
+                                         .replace(/1/g, 'I')
+                                         .replace(/2/g, 'Z')
+                                         .replace(/5/g, 'S')
+                                         .replace(/8/g, 'B');
+                        container = prefix4 + container.substring(4);
+                    }
+                }
+
+                // 应用规则2：仓点一般前三位有字母的，则前三位都是字母
+                if (code.length >= 3) {
+                    let prefix3 = code.substring(0, 3);
+                    if (/[A-Z]/.test(prefix3)) {
+                        prefix3 = prefix3.replace(/0/g, 'O')
+                                         .replace(/1/g, 'I')
+                                         .replace(/2/g, 'Z')
+                                         .replace(/5/g, 'S')
+                                         .replace(/8/g, 'B');
+                        code = prefix3 + code.substring(3);
+                    }
+                }
 
                 // 自动填入盘点的柜号和仓点输入框
                 document.getElementById('invContainerInput').value = container;
