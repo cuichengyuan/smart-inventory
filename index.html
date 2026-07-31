@@ -200,16 +200,6 @@
             font-weight: 500;
             padding: 24px 0;
         }
-        .blank-panel {
-            background-color: #fff;
-            padding: 40px 18px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            text-align: center;
-            color: #888;
-            font-size: 18px;
-            font-weight: 500;
-        }
         .transfer-row {
             font-size: 18px;
             font-weight: bold;
@@ -224,7 +214,60 @@
             border-bottom: none;
         }
 
-        /* 自定义弹窗样式 */
+        /* 盘点标签页专属样式 */
+        .inventory-panel {
+            background-color: #fff;
+            padding: 30px 18px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        .btn-camera {
+            width: 100%;
+            height: 60px;
+            background-color: #34c759;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 10px rgba(52, 199, 89, 0.3);
+        }
+        .btn-camera:active {
+            background-color: #28a745;
+        }
+        #cameraInput {
+            display: none;
+        }
+        .scan-result-card {
+            margin-top: 20px;
+            text-align: left;
+            background: #f9f9f9;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+        .scan-result-card h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .scan-line {
+            font-size: 17px;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: bold;
+        }
+        .scan-line span {
+            color: #007aff;
+        }
+
+        /* 自定义修改 LOC / 状态弹窗 */
         #customModal {
             display: none;
             position: fixed;
@@ -271,7 +314,6 @@
             gap: 24px;
             margin-bottom: 16px;
         }
-        /* 推荐库位样式 */
         .modal-recommend {
             font-size: 16px;
             font-weight: bold;
@@ -304,6 +346,8 @@
             color: #fff;
         }
     </style>
+    <!-- 引入 Tesseract.js 用于前端图像文字识别 (OCR) -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
 </head>
 <body>
 
@@ -311,7 +355,7 @@
     <div class="tabs-nav">
         <button class="tab-btn active" onclick="switchTab(0)">找货</button>
         <button class="tab-btn" onclick="switchTab(1)">转仓</button>
-        <button class="tab-btn" onclick="switchTab(2)">放货</button>
+        <button class="tab-btn" onclick="switchTab(2)">盘点</button>
     </div>
 
     <!-- 标签一：找货 -->
@@ -363,9 +407,16 @@
         </div>
     </div>
 
-    <!-- 标签三：放货 -->
+    <!-- 标签三：盘点 -->
     <div id="tabContent2" class="tab-content">
-        <div class="blank-panel">放货功能开发中...</div>
+        <div class="inventory-panel">
+            <!-- 隐藏的拍照/文件上传 input -->
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="handleImageCapture(event)">
+            <button type="button" class="btn-camera" onclick="document.getElementById('cameraInput').click()">
+                📷 拍照识别标签
+            </button>
+            <div id="scanResultContainer"></div>
+        </div>
     </div>
 
     <!-- 自定义修改 LOC / 状态弹窗 -->
@@ -382,7 +433,6 @@
                     <input type="checkbox" id="modalHoldCheck" onchange="handleModalCheckboxChange('hold')"> HOLD
                 </label>
             </div>
-            <!-- 推荐库位展示区域 -->
             <div class="modal-recommend" id="modalRecommendText">推荐库位：计算中...</div>
             <div class="modal-btns">
                 <button type="button" class="btn-cancel" onclick="closeCustomModal(false)">取消</button>
@@ -402,19 +452,11 @@
             const contents = document.querySelectorAll('.tab-content');
 
             buttons.forEach((btn, idx) => {
-                if (idx === index) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
+                btn.classList.toggle('active', idx === index);
             });
 
             contents.forEach((content, idx) => {
-                if (idx === index) {
-                    content.classList.add('active');
-                } else {
-                    content.classList.remove('active');
-                }
+                content.classList.toggle('active', idx === index);
             });
         }
 
@@ -515,7 +557,7 @@
                              data-container="${safeContainer}" 
                              data-code="${safeCode}" 
                              data-loc="${safeLoc}"
-                             ondblclick="triggerEditLoc(this)">
+                             onclick="triggerEditLoc(this)">
                             <div class="row-top">
                                 <span>${item.container || ''}</span>
                                 <span>${item.code || ''}</span>
@@ -559,7 +601,6 @@
                 document.getElementById('modalReleaseCheck').checked = false;
                 document.getElementById('modalHoldCheck').checked = false;
                 
-                // 计算并展示推荐库位
                 const recommendBox = document.getElementById('modalRecommendText');
                 recommendBox.innerText = "推荐库位：计算中...";
 
@@ -793,6 +834,46 @@
             } finally {
                 transferBtn.disabled = false;
                 transferBtn.innerText = '转化任务';
+            }
+        }
+
+        // 拍照识别逻辑（盘点标签页）
+        async function handleImageCapture(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const resultContainer = document.getElementById('scanResultContainer');
+            resultContainer.innerHTML = `<div class="no-result">正在识别照片中的文字，请稍候...</div>`;
+
+            try {
+                // 使用 Tesseract.js 进行中英文 OCR 识别
+                const { data: { text } } = await Tesseract.recognize(
+                    file,
+                    'eng',
+                    { logger: m => console.log(m) }
+                );
+
+                // 按行分割文本并过滤掉空白行
+                const lines = text.split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0);
+
+                let container = lines.length > 0 ? lines[0] : '未识别';
+                let code = lines.length > 1 ? lines[1] : '未识别';
+
+                resultContainer.innerHTML = `
+                    <div class="scan-result-card">
+                        <h3>识别结果：</h3>
+                        <div class="scan-line">Container (第一行): <span>${container}</span></div>
+                        <div class="scan-line">CODE (第二行): <span>${code}</span></div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error("OCR 识别失败:", error);
+                resultContainer.innerHTML = `<div class="no-result" style="color: red;">识别失败，请重新拍照。</div>`;
+            } finally {
+                // 清空 input，允许连续拍同一张照片
+                event.target.value = '';
             }
         }
     </script>
