@@ -104,10 +104,6 @@
             align-items: center;
             gap: 10px;
         }
-        #codeInput {
-            flex: 1;
-            min-width: 0;
-        }
         .checkbox-label {
             display: flex;
             align-items: center;
@@ -217,10 +213,10 @@
         /* 盘点标签页专属样式 */
         .inventory-panel {
             background-color: #fff;
-            padding: 30px 18px;
+            padding: 20px 18px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            text-align: center;
+            margin-bottom: 16px;
         }
         .btn-camera {
             width: 100%;
@@ -243,28 +239,6 @@
         }
         #cameraInput {
             display: none;
-        }
-        .scan-result-card {
-            margin-top: 20px;
-            text-align: left;
-            background: #f9f9f9;
-            padding: 16px;
-            border-radius: 8px;
-            border: 1px solid #eee;
-        }
-        .scan-result-card h3 {
-            font-size: 18px;
-            margin-bottom: 10px;
-            color: #333;
-        }
-        .scan-line {
-            font-size: 17px;
-            margin-bottom: 8px;
-            color: #555;
-            font-weight: bold;
-        }
-        .scan-line span {
-            color: #007aff;
         }
 
         /* 自定义修改 LOC / 状态弹窗 */
@@ -410,12 +384,38 @@
     <!-- 标签三：盘点 -->
     <div id="tabContent2" class="tab-content">
         <div class="inventory-panel">
-            <!-- 隐藏的拍照/文件上传 input -->
             <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="handleImageCapture(event)">
             <button type="button" class="btn-camera" onclick="document.getElementById('cameraInput').click()">
-                📷 拍照识别标签
+                📷 拍照识别标签并查询
             </button>
-            <div id="scanResultContainer"></div>
+        </div>
+
+        <div class="container-box">
+            <div class="input-group">
+                <label class="title-label">柜号</label>
+                <div class="input-wrapper">
+                    <input type="text" id="invContainerInput" placeholder="" oninput="formatInput(this)">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="title-label">仓点</label>
+                <div class="code-row-wrapper">
+                    <input type="text" id="invCodeInput" placeholder="" oninput="formatInput(this)">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="invCodeFuzzy"> 模糊
+                    </label>
+                </div>
+            </div>
+
+            <button type="button" id="invQueryBtn" class="btn-query" onclick="handleInventoryQuery()">查询</button>
+        </div>
+
+        <div class="result-box">
+            <div class="result-title" id="invResultTitle">盘点查询结果（0条）</div>
+            <div id="invResultList">
+                <div class="no-result">请拍照或输入条件点击查询</div>
+            </div>
         </div>
     </div>
 
@@ -444,7 +444,6 @@
     <script>
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyb8LkK6MFSwGBr5tpmh-1BRibRIl_SnfTuwlyV0Jw0k6XQqYDCph4T3Oy6FfV0Gy0/exec";
 
-        let currentEditingElement = null;
         let modalResolveCallback = null;
 
         function switchTab(index) {
@@ -466,17 +465,18 @@
             inputElement.value = val;
         }
 
-        async function handleQuery() {
-            const containerRaw = document.getElementById('containerInput').value.trim().replace(/\s+/g, ' ');
+        // 通用查询执行函数
+        async function executeQuery(containerInputId, codeInputId, fuzzyCheckId, resultListId, resultTitleId, queryBtnId) {
+            const containerRaw = document.getElementById(containerInputId).value.trim().replace(/\s+/g, ' ');
             const containerVals = containerRaw ? containerRaw.split(' ') : [];
 
-            const codeRaw = document.getElementById('codeInput').value.trim().replace(/\s+/g, ' ');
+            const codeRaw = document.getElementById(codeInputId).value.trim().replace(/\s+/g, ' ');
             const codeVals = codeRaw ? codeRaw.split(' ') : [];
-            const codeFuzzy = document.getElementById('code模糊').checked;
+            const codeFuzzy = document.getElementById(fuzzyCheckId).checked;
             
-            const resultList = document.getElementById('resultList');
-            const resultTitle = document.getElementById('resultTitle');
-            const queryBtn = document.getElementById('queryBtn');
+            const resultList = document.getElementById(resultListId);
+            const resultTitle = document.getElementById(resultTitleId);
+            const queryBtn = document.getElementById(queryBtnId);
 
             queryBtn.disabled = true;
             queryBtn.innerText = '正在查询...';
@@ -579,6 +579,14 @@
                 queryBtn.disabled = false;
                 queryBtn.innerText = '查询';
             }
+        }
+
+        function handleQuery() {
+            executeQuery('containerInput', 'codeInput', 'code模糊', 'resultList', 'resultTitle', 'queryBtn');
+        }
+
+        function handleInventoryQuery() {
+            executeQuery('invContainerInput', 'invCodeInput', 'invCodeFuzzy', 'invResultList', 'invResultTitle', 'invQueryBtn');
         }
 
         function handleModalCheckboxChange(type) {
@@ -837,42 +845,39 @@
             }
         }
 
-        // 拍照识别逻辑（盘点标签页）
+        // 盘点标签页：拍照识别并自动填充查询
         async function handleImageCapture(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            const resultContainer = document.getElementById('scanResultContainer');
-            resultContainer.innerHTML = `<div class="no-result">正在识别照片中的文字，请稍候...</div>`;
+            const invResultList = document.getElementById('invResultList');
+            invResultList.innerHTML = `<div class="no-result">正在识别照片中的标签文字...</div>`;
 
             try {
-                // 使用 Tesseract.js 进行中英文 OCR 识别
                 const { data: { text } } = await Tesseract.recognize(
                     file,
                     'eng',
                     { logger: m => console.log(m) }
                 );
 
-                // 按行分割文本并过滤掉空白行
                 const lines = text.split('\n')
                     .map(line => line.trim())
                     .filter(line => line.length > 0);
 
-                let container = lines.length > 0 ? lines[0] : '未识别';
-                let code = lines.length > 1 ? lines[1] : '未识别';
+                let container = lines.length > 0 ? lines[0] : '';
+                let code = lines.length > 1 ? lines[1] : '';
 
-                resultContainer.innerHTML = `
-                    <div class="scan-result-card">
-                        <h3>识别结果：</h3>
-                        <div class="scan-line">Container (第一行): <span>${container}</span></div>
-                        <div class="scan-line">CODE (第二行): <span>${code}</span></div>
-                    </div>
-                `;
+                // 自动填入盘点的柜号和仓点输入框
+                document.getElementById('invContainerInput').value = container;
+                document.getElementById('invCodeInput').value = code;
+
+                // 自动触发盘点查询
+                handleInventoryQuery();
+
             } catch (error) {
                 console.error("OCR 识别失败:", error);
-                resultContainer.innerHTML = `<div class="no-result" style="color: red;">识别失败，请重新拍照。</div>`;
+                invResultList.innerHTML = `<div class="no-result" style="color: red;">识别失败，请重新拍照。</div>`;
             } finally {
-                // 清空 input，允许连续拍同一张照片
                 event.target.value = '';
             }
         }
