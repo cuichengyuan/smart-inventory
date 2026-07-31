@@ -844,7 +844,7 @@
             }
         }
 
-        // 核心图像预处理函数：缩放、转灰度、增强对比度
+        // 核心图像预处理函数：裁剪白色底色区域、转灰度、增强对比度
         function preprocessImage(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -854,7 +854,6 @@
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
 
-                        // 限制最大宽度/高度，防止高像素图片拖慢处理速度
                         let width = img.width;
                         let height = img.height;
                         const maxDim = 1200;
@@ -870,20 +869,33 @@
 
                         canvas.width = width;
                         canvas.height = height;
-
-                        // 绘制到 Canvas 并转灰度与增强对比度
                         ctx.drawImage(img, 0, 0, width, height);
+
                         const imgData = ctx.getImageData(0, 0, width, height);
                         const data = imgData.data;
 
-                        // 简单的对比度拉伸与灰度转化
+                        // 仅保留白色底色区域内的文字（过滤周围非白色的杂乱背景）
                         for (let i = 0; i < data.length; i += 4) {
-                            let avg = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-                            // 增强对比度（让亮处更亮，暗处更暗，凸显黑色文字）
-                            avg = avg < 130 ? avg * 0.8 : Math.min(255, avg * 1.2);
-                            data[i] = avg;     // R
-                            data[i + 1] = avg; // G
-                            data[i + 2] = avg; // B
+                            let r = data[i];
+                            let g = data[i+1];
+                            let b = data[i+2];
+
+                            // 判断是否为白色底色（R, G, B 均较高代表接近白色）
+                            let isWhiteBg = (r > 200 && g > 200 && b > 200);
+
+                            if (isWhiteBg) {
+                                // 白色区域内部文字加深处理
+                                let avg = (r * 0.299 + g * 0.587 + b * 0.114);
+                                avg = avg < 130 ? 0 : 255; // 二值化：黑字白底
+                                data[i] = avg;
+                                data[i+1] = avg;
+                                data[i+2] = avg;
+                            } else {
+                                // 非白色背景区域直接涂白过滤掉干扰
+                                data[i] = 255;
+                                data[i+1] = 255;
+                                data[i+2] = 255;
+                            }
                         }
 
                         ctx.putImageData(imgData, 0, 0);
@@ -897,39 +909,71 @@
             });
         }
 
-        // 核心识别处理与规则应用函数
+        // 核心识别处理与严格规则应用函数
         function processOCRText(text) {
             const lines = text.split('\n')
-                .map(line => line.trim())
+                .map(line => line.trim().toUpperCase())
                 .filter(line => line.length > 0);
 
-            let container = lines.length > 0 ? lines[0].toUpperCase() : '';
-            let code = lines.length > 1 ? lines[1].toUpperCase() : '';
+            let container = '';
+            let code = '';
 
-            // 柜号规则：如果前四位中有字母的，则前四位都是字母
-            if (container.length >= 4) {
-                let prefix4 = container.substring(0, 4);
-                if (/[A-Z]/.test(prefix4)) {
-                    prefix4 = prefix4.replace(/0/g, 'O')
-                                     .replace(/1/g, 'I')
-                                     .replace(/2/g, 'Z')
-                                     .replace(/5/g, 'S')
-                                     .replace(/8/g, 'B');
-                    container = prefix4 + container.substring(4);
+            // 1. 处理第一行：柜号
+            if (lines.length > 0) {
+                let rawContainer = lines[0].replace(/[^A-Z0-9\-]/g, '');
+                
+                // 检查是否为格式 B：3个数字 + '-' + 8个数字
+                let formatBRegex = /^(\d{3})-(\d{8})/;
+                let matchB = rawContainer.match(formatBRegex);
+
+                if (matchB) {
+                    container = `${matchB[1]}-${matchB[2]}`; // 严格截取 3位数字-8位数字
+                } else {
+                    // 检查是否为格式 A：4个字母 + 7个数字（前4位如果是字母，自动纠错数字/字母混淆）
+                    if (rawContainer.length >= 4) {
+                        let prefix4 = rawContainer.substring(0, 4)
+                            .replace(/0/g, 'O')
+                            .replace(/1/g, 'I')
+                            .replace(/2/g, 'Z')
+                            .replace(/5/g, 'S')
+                            .replace(/8/g, 'B');
+                        
+                        let rest = rawContainer.substring(4);
+                        let combined = prefix4 + rest;
+                        // 柜号总共通常最多 11 位 (4字母 + 7数字)，如果超过则截取前面部分
+                        if (combined.length > 11) {
+                            container = combined.substring(0, 11);
+                        } else {
+                            container = combined;
+                        }
+                    } else {
+                        container = rawContainer;
+                    }
                 }
             }
 
-            // 仓点规则：前三位有字母的，则前三位都是字母
-            if (code.length >= 3) {
-                let prefix3 = code.substring(0, 3);
-                if (/[A-Z]/.test(prefix3)) {
-                    prefix3 = prefix3.replace(/0/g, 'O')
-                                     .replace(/1/g, 'I')
-                                     .replace(/2/g, 'Z')
-                                     .replace(/5/g, 'S')
-                                     .replace(/8/g, 'B');
-                    code = prefix3 + code.substring(3);
+            // 2. 处理第二行：仓点
+            if (lines.length > 1) {
+                let rawCode = lines[1].replace(/[^A-Z0-9\-]/g, '');
+
+                // 检查是否带 -HOLD 后缀
+                let hasHold = rawCode.includes('-HOLD');
+                let cleanCodeWithoutHold = rawCode.replace('-HOLD', '');
+
+                // 规则检查：前三位有字母的，前三位如果是字母则纠错
+                if (cleanCodeWithoutHold.length >= 3) {
+                    let prefix3 = cleanCodeWithoutHold.substring(0, 3);
+                    if (/[A-Z]/.test(prefix3)) {
+                        prefix3 = prefix3.replace(/0/g, 'O')
+                                         .replace(/1/g, 'I')
+                                         .replace(/2/g, 'Z')
+                                         .replace(/5/g, 'S')
+                                         .replace(/8/g, 'B');
+                        cleanCodeWithoutHold = prefix3 + cleanCodeWithoutHold.substring(3);
+                    }
                 }
+
+                code = cleanCodeWithoutHold + (hasHold ? '-HOLD' : '');
             }
 
             return { container, code };
@@ -941,10 +985,9 @@
             if (!file) return;
 
             const resultList = document.getElementById('resultList');
-            resultList.innerHTML = `<div class="no-result">正在优化图像并识别标签文字...</div>`;
+            resultList.innerHTML = `<div class="no-result">正在提取白色标签区域并识别...</div>`;
 
             try {
-                // 预处理图像
                 const processedBlob = await preprocessImage(file);
 
                 const { data: { text } } = await Tesseract.recognize(
@@ -955,11 +998,9 @@
 
                 const result = processOCRText(text);
 
-                // 自动填入找货的柜号和仓点输入框
                 document.getElementById('containerInput').value = result.container;
                 document.getElementById('codeInput').value = result.code;
 
-                // 自动触发找货查询
                 handleQuery();
 
             } catch (error) {
@@ -976,10 +1017,9 @@
             if (!file) return;
 
             const invResultList = document.getElementById('invResultList');
-            invResultList.innerHTML = `<div class="no-result">正在优化图像并识别标签文字...</div>`;
+            invResultList.innerHTML = `<div class="no-result">正在提取白色标签区域并识别...</div>`;
 
             try {
-                // 预处理图像
                 const processedBlob = await preprocessImage(file);
 
                 const { data: { text } } = await Tesseract.recognize(
@@ -990,11 +1030,9 @@
 
                 const result = processOCRText(text);
 
-                // 自动填入盘点的柜号和仓点输入框
                 document.getElementById('invContainerInput').value = result.container;
                 document.getElementById('invCodeInput').value = result.code;
 
-                // 自动触发盘点查询
                 handleInventoryQuery();
 
             } catch (error) {
