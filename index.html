@@ -844,7 +844,7 @@
             }
         }
 
-        // 核心图像预处理函数：裁剪白色底色区域、转灰度、增强对比度
+        // 核心图像预处理函数
         function preprocessImage(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -853,55 +853,10 @@
                     img.onload = function() {
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
-
-                        let width = img.width;
-                        let height = img.height;
-                        const maxDim = 1200;
-                        if (width > maxDim || height > maxDim) {
-                            if (width > height) {
-                                height = Math.round((height * maxDim) / width);
-                                width = maxDim;
-                            } else {
-                                width = Math.round((width * maxDim) / height);
-                                height = maxDim;
-                            }
-                        }
-
-                        canvas.width = width;
-                        canvas.height = height;
-                        ctx.drawImage(img, 0, 0, width, height);
-
-                        const imgData = ctx.getImageData(0, 0, width, height);
-                        const data = imgData.data;
-
-                        // 仅保留白色底色区域内的文字（过滤周围非白色的杂乱背景）
-                        for (let i = 0; i < data.length; i += 4) {
-                            let r = data[i];
-                            let g = data[i+1];
-                            let b = data[i+2];
-
-                            // 判断是否为白色底色（R, G, B 均较高代表接近白色）
-                            let isWhiteBg = (r > 200 && g > 200 && b > 200);
-
-                            if (isWhiteBg) {
-                                // 白色区域内部文字加深处理
-                                let avg = (r * 0.299 + g * 0.587 + b * 0.114);
-                                avg = avg < 130 ? 0 : 255; // 二值化：黑字白底
-                                data[i] = avg;
-                                data[i+1] = avg;
-                                data[i+2] = avg;
-                            } else {
-                                // 非白色背景区域直接涂白过滤掉干扰
-                                data[i] = 255;
-                                data[i+1] = 255;
-                                data[i+2] = 255;
-                            }
-                        }
-
-                        ctx.putImageData(imgData, 0, 0);
-                        canvas.toBlob((blob) => {
-                            resolve(blob);
-                        }, 'image/jpeg', 0.85);
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL('image/jpeg'));
                     };
                     img.src = e.target.result;
                 };
@@ -909,140 +864,70 @@
             });
         }
 
-        // 核心识别处理与严格规则应用函数
-        function processOCRText(text) {
-            const lines = text.split('\n')
-                .map(line => line.trim().toUpperCase())
-                .filter(line => line.length > 0);
+        // 解析识别文本并填充输入框
+        async function parseTextAndFill(text, containerInputId, codeInputId, queryFunc) {
+            console.log("OCR识别出的原始文本:", text);
+            let cleaned = text.toUpperCase().replace(/[\r\n]+/g, ' ');
+            const words = cleaned.split(/\s+/).filter(w => w.length > 1);
+            
+            let foundContainer = "";
+            let foundCode = "";
 
-            let container = '';
-            let code = '';
-
-            // 1. 处理第一行：柜号
-            if (lines.length > 0) {
-                let rawContainer = lines[0].replace(/[^A-Z0-9\-]/g, '');
-                
-                // 检查是否为格式 B：3个数字 + '-' + 8个数字
-                let formatBRegex = /^(\d{3})-(\d{8})/;
-                let matchB = rawContainer.match(formatBRegex);
-
-                if (matchB) {
-                    container = `${matchB[1]}-${matchB[2]}`; // 严格截取 3位数字-8位数字
-                } else {
-                    // 检查是否为格式 A：4个字母 + 7个数字（前4位如果是字母，自动纠错数字/字母混淆）
-                    if (rawContainer.length >= 4) {
-                        let prefix4 = rawContainer.substring(0, 4)
-                            .replace(/0/g, 'O')
-                            .replace(/1/g, 'I')
-                            .replace(/2/g, 'Z')
-                            .replace(/5/g, 'S')
-                            .replace(/8/g, 'B');
-                        
-                        let rest = rawContainer.substring(4);
-                        let combined = prefix4 + rest;
-                        // 柜号总共通常最多 11 位 (4字母 + 7数字)，如果超过则截取前面部分
-                        if (combined.length > 11) {
-                            container = combined.substring(0, 11);
-                        } else {
-                            container = combined;
-                        }
-                    } else {
-                        container = rawContainer;
-                    }
+            for (let word of words) {
+                if (!foundContainer && (word.length >= 4 && /\d/.test(word))) {
+                    foundContainer = word;
+                } else if (!foundCode && word !== foundContainer) {
+                    foundCode = word;
                 }
             }
 
-            // 2. 处理第二行：仓点
-            if (lines.length > 1) {
-                let rawCode = lines[1].replace(/[^A-Z0-9\-]/g, '');
-
-                // 检查是否带 -HOLD 后缀
-                let hasHold = rawCode.includes('-HOLD');
-                let cleanCodeWithoutHold = rawCode.replace('-HOLD', '');
-
-                // 规则检查：前三位有字母的，前三位如果是字母则纠错
-                if (cleanCodeWithoutHold.length >= 3) {
-                    let prefix3 = cleanCodeWithoutHold.substring(0, 3);
-                    if (/[A-Z]/.test(prefix3)) {
-                        prefix3 = prefix3.replace(/0/g, 'O')
-                                         .replace(/1/g, 'I')
-                                         .replace(/2/g, 'Z')
-                                         .replace(/5/g, 'S')
-                                         .replace(/8/g, 'B');
-                        cleanCodeWithoutHold = prefix3 + cleanCodeWithoutHold.substring(3);
-                    }
-                }
-
-                code = cleanCodeWithoutHold + (hasHold ? '-HOLD' : '');
+            if (foundContainer) {
+                document.getElementById(containerInputId).value = foundContainer;
+            }
+            if (foundCode) {
+                document.getElementById(codeInputId).value = foundCode;
             }
 
-            return { container, code };
+            if (typeof queryFunc === 'function') {
+                queryFunc();
+            }
         }
 
-        // 找货标签页：拍照识别并自动填充查询
         async function handleSearchImageCapture(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            const resultList = document.getElementById('resultList');
-            resultList.innerHTML = `<div class="no-result">正在提取白色标签区域并识别...</div>`;
-
+            alert("正在识别图片文字，请稍候...");
             try {
-                const processedBlob = await preprocessImage(file);
-
-                const { data: { text } } = await Tesseract.recognize(
-                    processedBlob,
-                    'eng',
-                    { logger: m => console.log(m) }
-                );
-
-                const result = processOCRText(text);
-
-                document.getElementById('containerInput').value = result.container;
-                document.getElementById('codeInput').value = result.code;
-
-                handleQuery();
-
-            } catch (error) {
-                console.error("OCR 识别失败:", error);
-                resultList.innerHTML = `<div class="no-result" style="color: red;">识别失败，请重新拍照。</div>`;
-            } finally {
-                event.target.value = '';
+                const processedImageUrl = await preprocessImage(file);
+                const result = await Tesseract.recognize(processedImageUrl, 'eng', {
+                    logger: m => console.log(m)
+                });
+                await parseTextAndFill(result.data.text, 'containerInput', 'codeInput', handleQuery);
+            } catch (err) {
+                console.error(err);
+                alert("识别失败: " + err.message);
             }
+            event.target.value = '';
         }
 
-        // 盘点标签页：拍照识别并自动填充查询
         async function handleImageCapture(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            const invResultList = document.getElementById('invResultList');
-            invResultList.innerHTML = `<div class="no-result">正在提取白色标签区域并识别...</div>`;
-
+            alert("正在识别图片文字，请稍候...");
             try {
-                const processedBlob = await preprocessImage(file);
-
-                const { data: { text } } = await Tesseract.recognize(
-                    processedBlob,
-                    'eng',
-                    { logger: m => console.log(m) }
-                );
-
-                const result = processOCRText(text);
-
-                document.getElementById('invContainerInput').value = result.container;
-                document.getElementById('invCodeInput').value = result.code;
-
-                handleInventoryQuery();
-
-            } catch (error) {
-                console.error("OCR 识别失败:", error);
-                invResultList.innerHTML = `<div class="no-result" style="color: red;">识别失败，请重新拍照。</div>`;
-            } finally {
-                event.target.value = '';
+                const processedImageUrl = await preprocessImage(file);
+                const result = await Tesseract.recognize(processedImageUrl, 'eng', {
+                    logger: m => console.log(m)
+                });
+                await parseTextAndFill(result.data.text, 'invContainerInput', 'invCodeInput', handleInventoryQuery);
+            } catch (err) {
+                console.error(err);
+                alert("识别失败: " + err.message);
             }
+            event.target.value = '';
         }
     </script>
-
 </body>
 </html>
