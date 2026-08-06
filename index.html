@@ -5,806 +5,186 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>库存查询系统</title>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f5f5f5;
-            padding: 16px;
-        }
-        /* 顶部标签导航栏样式 */
-        .tabs-nav {
-            display: flex;
-            background-color: #e0e0e0;
-            border-radius: 8px;
-            padding: 4px;
-            margin-bottom: 16px;
-        }
-        .tab-btn {
-            flex: 1;
-            height: 44px;
-            background: none;
-            border: none;
-            font-size: 18px;
-            font-weight: bold;
-            color: #555;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .tab-btn.active {
-            background-color: #fff;
-            color: #007aff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        /* 标签页内容区块控制 */
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        .container-box {
-            background-color: #fff;
-            padding: 18px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            margin-bottom: 16px;
-        }
-        .input-group {
-            display: flex;
-            align-items: center;
-            margin-bottom: 14px;
-        }
-        .input-group.column {
-            flex-direction: column;
-            align-items: stretch;
-        }
-        .input-group label.title-label {
-            width: auto;
-            margin-right: 8px;
-            margin-bottom: 6px;
-            font-size: 18px;
-            color: #111;
-            font-weight: 700;
-            flex-shrink: 0;
-        }
-        .input-wrapper {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .input-group input[type="text"],
-        .input-group textarea {
-            flex: 1;
-            padding: 12px 14px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 18px;
-            font-weight: bold;
-            outline: none;
-            text-transform: uppercase;
-            width: 100%;
-        }
-        .input-group textarea {
-            resize: vertical;
-            font-family: inherit;
-        }
-        .input-group input[type="text"]:focus,
-        .input-group textarea:focus {
-            border-color: #007aff;
-        }
-        .code-row-wrapper {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .checkbox-label {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
-            white-space: nowrap;
-            cursor: pointer;
-            user-select: none;
-            flex-shrink: 0;
-        }
-        .checkbox-label input[type="checkbox"] {
-            width: 22px;
-            height: 22px;
-            cursor: pointer;
-        }
-        .btn-query {
-            width: 100%;
-            height: 50px;
-            background-color: #007aff;
-            color: #fff;
-            border: none;
-            border-radius: 6px;
-            font-size: 20px;
-            font-weight: bold;
-            margin-top: 10px;
-            cursor: pointer;
-        }
-        .btn-query:active {
-            background-color: #005bb5;
-        }
-        .btn-query:disabled {
-            background-color: #9ac0f5;
-            cursor: not-allowed;
-        }
-        .result-box {
-            background-color: #fff;
-            padding: 18px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .result-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 14px;
-            color: #111;
-        }
-        .result-item {
-            padding: 14px 10px;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            cursor: pointer;
-            user-select: none;
-            transition: background-color 0.2s;
-        }
-        .result-item:active {
-            background-color: #f0f0f0;
-        }
-        .result-item:last-child {
-            border-bottom: none;
-        }
-        .row-top {
-            font-size: 18px;
-            font-weight: bold;
-            color: #007aff;
-            display: flex;
-            justify-content: space-between;
-        }
-        .row-bottom {
-            font-size: 18px;
-            color: #222;
-            display: flex;
-            justify-content: space-between;
-            font-weight: bold;
-            align-items: center;
-        }
-        .loc-text {
-            color: #007aff;
-            background-color: #eef5ff;
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-        .no-result {
-            text-align: center;
-            color: #555;
-            font-size: 17px;
-            font-weight: 500;
-            padding: 24px 0;
-        }
-        .transfer-row {
-            font-size: 18px;
-            font-weight: bold;
-            color: #333;
-            padding: 10px 12px;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .transfer-row:last-child {
-            border-bottom: none;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #f5f6fa; color: #333; padding: 12px; font-size: 14px; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        h2 { text-align: center; margin-bottom: 15px; font-size: 18px; color: #2c3e50; }
+        
+        .form-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; color: #555; }
+        input[type="text"] { width: 100%; padding: 10px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 16px; outline: none; transition: border-color 0.2s; }
+        input[type="text"]:focus { border-color: #409eff; }
+        
+        .checkbox-group { display: flex; align-items: center; margin-bottom: 12px; font-size: 15px; }
+        .checkbox-group input { margin-right: 8px; width: 18px; height: 18px; }
 
-        /* 自定义修改 LOC / 状态弹窗 */
-        #customModal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-            padding: 16px;
-        }
-        .modal-card {
-            background: #fff;
-            padding: 24px;
-            border-radius: 10px;
-            width: 100%;
-            max-width: 380px;
-            box-shadow: 0 6px 16px rgba(0,0,0,0.2);
-        }
-        .modal-title {
-            font-size: 22px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #111;
-        }
-        .modal-info {
-            font-size: 17px;
-            font-weight: 600;
-            color: #555;
-            margin-bottom: 16px;
-            line-height: 1.4;
-        }
-        .modal-input {
-            width: 100%;
-            padding: 14px;
-            font-size: 20px;
-            font-weight: bold;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            margin-bottom: 16px;
-            text-transform: uppercase;
-        }
-        .modal-checkboxes {
-            display: flex;
-            gap: 24px;
-            margin-bottom: 16px;
-        }
-        .modal-recommend {
-            font-size: 16px;
-            font-weight: bold;
-            color: #d9534f;
-            background-color: #fdf7f7;
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            border: 1px dashed #d9534f;
-        }
-        .modal-btns {
-            display: flex;
-            gap: 12px;
-        }
-        .modal-btns button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 6px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .btn-cancel {
-            background-color: #e0e0e0;
-            color: #333;
-        }
-        .btn-confirm {
-            background-color: #007aff;
-            color: #fff;
-        }
+        .btn { width: 100%; padding: 12px; background-color: #409eff; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+        .btn:active { background-color: #3a8ee6; }
+        .btn:disabled { background-color: #a0cfff; cursor: not-allowed; }
+
+        #loading { text-align: center; color: #909399; margin: 15px 0; display: none; font-size: 14px; }
+        
+        .result-container { margin-top: 15px; max-height: 500px; overflow-y: auto; }
+        .result-card { background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+        .result-card div { margin-bottom: 6px; }
+        .result-card div:last-child { margin-bottom: 0; }
+        .label-title { color: #909399; font-size: 13px; }
+        .val-text { font-weight: 600; color: #303133; }
+        .highlight { color: #f56c6c; font-weight: bold; }
+        
+        .action-row { display: flex; gap: 8px; margin-top: 8px; }
+        .action-row input { flex: 1; padding: 6px; font-size: 14px; }
+        .small-btn { padding: 6px 12px; background-color: #67c23a; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; white-space: nowrap; }
+        .small-btn:active { background-color: #5daf34; }
+        
+        .error-msg { color: #f56c6c; text-align: center; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <!-- 顶部标签导航 -->
-    <div class="tabs-nav">
-        <button class="tab-btn active" onclick="switchTab(0)">找货</button>
-        <button class="tab-btn" onclick="switchTab(1)">转仓</button>
-        <button class="tab-btn" onclick="switchTab(2)">盘点</button>
+<div class="container">
+    <h2>库存查询与库位修改</h2>
+    
+    <div class="form-group">
+        <label for="containerInput">柜号 (Container，支持空格分隔多搜)：</label>
+        <input type="text" id="containerInput" placeholder="请输入柜号，例如: ABC 123">
     </div>
-
-    <!-- 标签一：找货 -->
-    <div id="tabContent0" class="tab-content active">
-        <div class="container-box">
-            <div class="input-group">
-                <label class="title-label">柜号</label>
-                <div class="input-wrapper">
-                    <input type="text" id="containerInput" placeholder="" oninput="formatInput(this)">
-                </div>
-            </div>
-
-            <div class="input-group">
-                <label class="title-label">仓点</label>
-                <div class="code-row-wrapper">
-                    <input type="text" id="codeInput" placeholder="" oninput="formatInput(this)">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="code模糊"> 模糊
-                    </label>
-                </div>
-            </div>
-
-            <button type="button" id="queryBtn" class="btn-query" onclick="handleQuery()">查询</button>
-        </div>
-
-        <div class="result-box">
-            <div class="result-title" id="resultTitle">查询结果（0条）</div>
-            <div id="resultList">
-                <div class="no-result">暂无查询结果，请输入条件点击查询</div>
-            </div>
-        </div>
+    
+    <div class="form-group">
+        <label for="codeInput">代码 / 仓点 (Code，支持空格分隔多搜)：</label>
+        <input type="text" id="codeInput" placeholder="请输入SKU代码">
     </div>
-
-    <!-- 标签二：转仓 -->
-    <div id="tabContent1" class="tab-content">
-        <div class="container-box">
-            <div class="input-group column">
-                <label class="title-label">转仓内容</label>
-                <textarea rows="5" id="transferInput" placeholder="请输入或粘贴内容..." oninput="formatInput(this)"></textarea>
-            </div>
-            <button type="button" id="transferBtn" class="btn-query" onclick="handleTransfer()">转化任务</button>
-        </div>
-
-        <div class="result-box">
-            <div class="result-title" id="transferResultTitle">转仓任务（0条）</div>
-            <div id="transferResultList">
-                <div class="no-result">暂无转化任务，请输入内容点击转化</div>
-            </div>
-        </div>
+    
+    <div class="checkbox-group">
+        <input type="checkbox" id="fuzzyCheck" checked>
+        <label for="fuzzyCheck" style="margin-bottom:0; cursor:pointer;">代码模糊匹配 (包含即可)</label>
     </div>
+    
+    <button class="btn" id="searchBtn" onclick="executeQuery()">查 询</button>
+    
+    <div id="loading">正在向服务器高效率检索数据，请稍候...</div>
+    <div id="errorMsg" class="error-msg"></div>
+    
+    <div class="result-container" id="resultContainer"></div>
+</div>
 
-    <!-- 标签三：盘点 -->
-    <div id="tabContent2" class="tab-content">
-        <div class="container-box">
-            <div class="input-group">
-                <label class="title-label">柜号</label>
-                <div class="input-wrapper">
-                    <input type="text" id="invContainerInput" placeholder="" oninput="formatInput(this)">
-                </div>
-            </div>
+<script>
+    // 自动获取当前 Web App 的 URL
+    const WEB_APP_URL = window.location.href.split('?')[0];
 
-            <div class="input-group">
-                <label class="title-label">仓点</label>
-                <div class="code-row-wrapper">
-                    <input type="text" id="invCodeInput" placeholder="" oninput="formatInput(this)">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="invCodeFuzzy"> 模糊
-                    </label>
-                </div>
-            </div>
-
-            <button type="button" id="invQueryBtn" class="btn-query" onclick="handleInventoryQuery()">查询</button>
-        </div>
-
-        <div class="result-box">
-            <div class="result-title" id="invResultTitle">盘点查询结果（0条）</div>
-            <div id="invResultList">
-                <div class="no-result">请输入条件点击查询</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 自定义修改 LOC / 状态弹窗 -->
-    <div id="customModal">
-        <div class="modal-card">
-            <div class="modal-title">修改库存信息</div>
-            <div class="modal-info" id="modalInfoText">柜号: - | 代码: -</div>
-            <input type="text" id="modalLocInput" class="modal-input" placeholder="输入新库位 LOC">
-            <div class="modal-checkboxes">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="modalReleaseCheck" onchange="handleModalCheckboxChange('release')"> Release
-                </label>
-                <label class="checkbox-label">
-                    <input type="checkbox" id="modalHoldCheck" onchange="handleModalCheckboxChange('hold')"> HOLD
-                </label>
-            </div>
-            <div class="modal-recommend" id="modalRecommendText">推荐库位：计算中...</div>
-            <div class="modal-btns">
-                <button type="button" class="btn-cancel" onclick="closeCustomModal(false)">取消</button>
-                <button type="button" class="btn-confirm" onclick="closeCustomModal(true)">确定</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyb8LkK6MFSwGBr5tpmh-1BRibRIl_SnfTuwlyV0Jw0k6XQqYDCph4T3Oy6FfV0Gy0/exec";
-
-        let modalResolveCallback = null;
-
-        function switchTab(index) {
-            const buttons = document.querySelectorAll('.tab-btn');
-            const contents = document.querySelectorAll('.tab-content');
-
-            buttons.forEach((btn, idx) => {
-                btn.classList.toggle('active', idx === index);
-            });
-
-            contents.forEach((content, idx) => {
-                content.classList.toggle('active', idx === index);
-            });
+    async function executeQuery() {
+        const containerInput = document.getElementById('containerInput').value.trim();
+        const codeInput = document.getElementById('codeInput').value.trim();
+        const isFuzzy = document.getElementById('fuzzyCheck').checked;
+        
+        const searchBtn = document.getElementById('searchBtn');
+        const loading = document.getElementById('loading');
+        const errorMsg = document.getElementById('errorMsg');
+        const resultContainer = document.getElementById('resultContainer');
+        
+        // 清空前置状态
+        errorMsg.textContent = '';
+        resultContainer.innerHTML = '';
+        
+        if (!containerInput && !codeInput) {
+            errorMsg.textContent = '请输入至少一个查询条件（柜号或代码）！';
+            return;
         }
 
-        function formatInput(inputElement) {
-            let val = inputElement.value.toUpperCase();
-            val = val.replace(/\s+/g, ' ');
-            inputElement.value = val;
-        }
+        searchBtn.disabled = true;
+        loading.style.display = 'block';
 
-        // 通用查询执行函数
-        async function executeQuery(containerInputId, codeInputId, fuzzyCheckId, resultListId, resultTitleId, queryBtnId) {
-            const containerRaw = document.getElementById(containerInputId).value.trim().replace(/\s+/g, ' ');
-            const containerVals = containerRaw ? containerRaw.split(' ') : [];
-
-            const codeRaw = document.getElementById(codeInputId).value.trim().replace(/\s+/g, ' ');
-            const codeVals = codeRaw ? codeRaw.split(' ') : [];
-            const codeFuzzy = document.getElementById(fuzzyCheckId).checked;
+        try {
+            // 拼装请求 URL，把参数传给后端让后端做精准过滤
+            const queryUrl = `${WEB_APP_URL}?action=getData&container=${encodeURIComponent(containerInput)}&code=${encodeURIComponent(codeInput)}&fuzzy=${isFuzzy}`;
             
-            const resultList = document.getElementById(resultListId);
-            const resultTitle = document.getElementById(resultTitleId);
-            const queryBtn = document.getElementById(queryBtnId);
-
-            queryBtn.disabled = true;
-            queryBtn.innerText = '正在查询...';
-            resultList.innerHTML = `<div class="no-result">正在从 Google 表格获取库存数据...</div>`;
-
+            const response = await fetch(queryUrl);
+            const textResult = await response.text();
+            
+            let data;
             try {
-                const response = await fetch(WEB_APP_URL + '?action=getData');
-                const textResult = await response.text();
-                
-                let inventoryData;
-                try {
-                    inventoryData = JSON.parse(textResult);
-                } catch (e) {
-                    alert("后台返回数据格式错误: " + textResult.substring(0, 150));
-                    throw new Error("后台未返回有效的 JSON 数据");
-                }
-
-                if (!Array.isArray(inventoryData)) {
-                    throw new Error("后端返回的数据格式不正确（不是数组）");
-                }
-
-                const filtered = inventoryData.filter(item => {
-                    const isBalanceValid = Number(item.balance) > 0;
-                    if (!isBalanceValid) return false;
-
-                    const itemContainer = String(item.container || '').toUpperCase();
-                    let matchContainer = true;
-                    if (containerVals.length > 0) {
-                        matchContainer = containerVals.some(val => itemContainer.includes(val));
-                    }
-
-                    const rawItemCode = String(item.code || '').toUpperCase();
-                    let matchCode = true;
-                    if (codeVals.length > 0) {
-                        let effectiveItemCode = rawItemCode;
-                        const fromIndex = rawItemCode.indexOf("FROM");
-                        if (fromIndex !== -1) {
-                            effectiveItemCode = rawItemCode.substring(0, fromIndex).trim();
-                        }
-
-                        matchCode = codeVals.some(val => {
-                            if (codeFuzzy) {
-                                return effectiveItemCode.includes(val);
-                            } else {
-                                return effectiveItemCode === val;
-                            }
-                        });
-                    }
-
-                    return matchContainer && matchCode;
-                });
-
-                resultTitle.innerText = `查询结果（${filtered.length}条）`;
-
-                if (filtered.length === 0) {
-                    resultList.innerHTML = `<div class="no-result">没有找到符合条件的非零库存记录</div>`;
-                    return;
-                }
-
-                filtered.sort((a, b) => {
-                    const locA = String(a.loc || '').toUpperCase();
-                    const locB = String(b.loc || '').toUpperCase();
-                    if (locA < locB) return -1;
-                    if (locA > locB) return 1;
-                    return 0;
-                });
-
-                let html = '';
-                filtered.forEach(item => {
-                    const safeSystemId = item.systemId || '';
-                    const safeContainer = (item.container || '').replace(/"/g, '&quot;');
-                    const safeCode = (item.code || '').replace(/"/g, '&quot;');
-                    const safeLoc = (item.loc || '').replace(/"/g, '&quot;');
-
-                    html += `
-                        <div class="result-item" 
-                             data-id="${safeSystemId}"
-                             data-container="${safeContainer}" 
-                             data-code="${safeCode}" 
-                             data-loc="${safeLoc}"
-                             onclick="triggerEditLoc(this)">
-                            <div class="row-top">
-                                <span>${item.container || ''}</span>
-                                <span>${item.code || ''}</span>
-                            </div>
-                            <div class="row-bottom">
-                                <span class="loc-text">LOC: ${item.loc || ''}</span>
-                                <span>Qty: ${item.balance}</span>
-                            </div>
-                        </div>
-                    `;
-                });
-                resultList.innerHTML = html;
-
-            } catch (error) {
-                console.error("查询出错:", error);
-                alert("查询捕获到错误: " + error.message);
-                resultList.innerHTML = `<div class="no-result" style="color: red;">查询失败: ${error.message}</div>`;
-            } finally {
-                queryBtn.disabled = false;
-                queryBtn.innerText = '查询';
-            }
-        }
-
-        function handleQuery() {
-            executeQuery('containerInput', 'codeInput', 'code模糊', 'resultList', 'resultTitle', 'queryBtn');
-        }
-
-        function handleInventoryQuery() {
-            executeQuery('invContainerInput', 'invCodeInput', 'invCodeFuzzy', 'invResultList', 'invResultTitle', 'invQueryBtn');
-        }
-
-        function handleModalCheckboxChange(type) {
-            const releaseCheck = document.getElementById('modalReleaseCheck');
-            const holdCheck = document.getElementById('modalHoldCheck');
-            if (type === 'release' && releaseCheck.checked) {
-                holdCheck.checked = false;
-            } else if (type === 'hold' && holdCheck.checked) {
-                releaseCheck.checked = false;
-            }
-        }
-
-        async function showCustomModal(container, code, oldLoc) {
-            return new Promise(async (resolve) => {
-                modalResolveCallback = resolve;
-                document.getElementById('modalInfoText').innerText = `柜号: ${container}\n代码: ${code}`;
-                const locInput = document.getElementById('modalLocInput');
-                locInput.value = oldLoc;
-                
-                document.getElementById('modalReleaseCheck').checked = false;
-                document.getElementById('modalHoldCheck').checked = false;
-                
-                const recommendBox = document.getElementById('modalRecommendText');
-                recommendBox.innerText = "推荐库位：计算中...";
-
-                try {
-                    let cleanCode = code.toUpperCase();
-                    cleanCode = cleanCode.replace(/-HOLD/gi, '').trim();
-                    const fromIdx = cleanCode.indexOf("FROM");
-                    if (fromIdx !== -1) {
-                        cleanCode = cleanCode.substring(0, fromIdx).trim();
-                    }
-
-                    const response = await fetch(WEB_APP_URL + '?action=getLocationRec');
-                    const textResult = await response.text();
-                    let recData = JSON.parse(textResult);
-
-                    if (Array.isArray(recData)) {
-                        let matchedRecs = recData.filter(row => {
-                            const rowCode = String(row.code || row.col1 || '').toUpperCase();
-                            return rowCode === cleanCode;
-                        });
-
-                        matchedRecs.sort((a, b) => {
-                            const valA = Number(a.val || a.col4 || 0);
-                            const valB = Number(b.val || b.col4 || 0);
-                            return valB - valA;
-                        });
-
-                        let topLocations = matchedRecs.slice(0, 3).map(r => r.location || r.col2).filter(Boolean);
-
-                        if (topLocations.length > 0) {
-                            recommendBox.innerText = `推荐库位：${topLocations.join('、')}`;
-                        } else {
-                            recommendBox.innerText = `推荐库位：暂无推荐库位`;
-                        }
-                    } else {
-                        recommendBox.innerText = `推荐库位：暂无推荐库位`;
-                    }
-                } catch (e) {
-                    console.error("获取推荐库位失败", e);
-                    recommendBox.innerText = `推荐库位：暂无推荐库位`;
-                }
-
-                document.getElementById('customModal').style.display = 'flex';
-                locInput.focus();
-            });
-        }
-
-        function closeCustomModal(isConfirm) {
-            document.getElementById('customModal').style.display = 'none';
-            if (modalResolveCallback) {
-                if (isConfirm) {
-                    modalResolveCallback({
-                        confirmed: true,
-                        newLoc: document.getElementById('modalLocInput').value.trim().toUpperCase(),
-                        isRelease: document.getElementById('modalReleaseCheck').checked,
-                        isHold: document.getElementById('modalHoldCheck').checked
-                    });
-                } else {
-                    modalResolveCallback({ confirmed: false });
-                }
-                modalResolveCallback = null;
-            }
-        }
-
-        async function triggerEditLoc(element) {
-            const systemId = element.getAttribute('data-id');
-            const container = element.getAttribute('data-container');
-            const code = element.getAttribute('data-code');
-            const oldLoc = element.getAttribute('data-loc');
-
-            const modalResult = await showCustomModal(container, code, oldLoc);
-            if (!modalResult.confirmed) return;
-
-            const trimmedLoc = modalResult.newLoc;
-            const isRelease = modalResult.isRelease;
-            const isHold = modalResult.isHold;
-
-            let newCode = code;
-            const hasHoldWord = /-HOLD/i.test(code);
-
-            if (isRelease) {
-                if (hasHoldWord) {
-                    newCode = code.replace(/-HOLD/gi, '').trim();
-                }
-            } else if (isHold) {
-                if (!hasHoldWord) {
-                    newCode = (code ? code + ' ' : '') + '-HOLD';
-                }
+                data = JSON.parse(textResult);
+            } catch (e) {
+                throw new Error("服务器返回数据格式异常: " + textResult.substring(0, 100));
             }
 
-            if (trimmedLoc === oldLoc && newCode === code) return;
-
-            const locSpan = element.querySelector('.loc-text');
-            const codeSpan = element.querySelector('.row-top span:nth-child(2)');
-            const originalLocText = locSpan.innerText;
-            const originalCodeText = codeSpan ? codeSpan.innerText : '';
-
-            locSpan.innerText = `LOC: 保存中...`;
-
-            try {
-                const updateUrl = `${WEB_APP_URL}?action=updateLoc&systemId=${encodeURIComponent(systemId)}&newLoc=${encodeURIComponent(trimmedLoc)}&newCode=${encodeURIComponent(newCode)}`;
-                
-                const response = await fetch(updateUrl);
-                const result = await response.json();
-
-                if (result.status === "success") {
-                    element.setAttribute('data-loc', trimmedLoc);
-                    element.setAttribute('data-code', newCode);
-                    locSpan.innerText = `LOC: ${trimmedLoc}`;
-                    if (codeSpan) codeSpan.innerText = newCode;
-                    alert("信息修改成功并已写入表格！");
-                } else {
-                    throw new Error(result.message || "修改失败");
-                }
-
-            } catch (error) {
-                console.error("保存失败:", error);
-                locSpan.innerText = originalLocText;
-                if (codeSpan) codeSpan.innerText = originalCodeText;
-                alert("保存失败: " + error.message);
+            if (data.error) {
+                throw new Error(data.error);
             }
-        }
 
-        async function handleTransfer() {
-            const text = document.getElementById('transferInput').value.trim();
-            const resultList = document.getElementById('transferResultList');
-            const resultTitle = document.getElementById('transferResultTitle');
-            const transferBtn = document.getElementById('transferBtn');
-
-            if (!text) {
-                alert("请输入需要转仓的内容");
+            if (!data || data.length === 0) {
+                resultContainer.innerHTML = '<div style="text-align:center; color:#909399; padding: 20px;">未找到符合条件且库存大于0的记录。</div>';
                 return;
             }
 
-            transferBtn.disabled = true;
-            transferBtn.innerText = '正在转化并匹配表格...';
-            resultList.innerHTML = `<div class="no-result">正在从 Google 表格获取数据并匹配原仓点库位和数量...</div>`;
+            // 渲染查询结果
+            let html = `<div style="margin-bottom: 8px; font-size: 13px; color: #606266;">共找到 <b>${data.length}</b> 条匹配记录：</div>`;
+            
+            data.forEach(item => {
+                html += `
+                    <div class="result-card" id="card-${item.systemId}">
+                        <div><span class="label-title">柜号:</span> <span class="val-text">${escapeHtml(item.container)}</span></div>
+                        <div><span class="label-title">代码:</span> <span class="val-text">${escapeHtml(item.code)}</span></div>
+                        <div><span class="label-title">当前库位:</span> <span class="val-text" id="loc-text-${item.systemId}">${escapeHtml(item.loc)}</span></div>
+                        <div><span class="label-title">结存数量 (Balance):</span> <span class="highlight">${item.balance}</span></div>
+                        <div class="action-row">
+                            <input type="text" id="new-loc-${item.systemId}" value="${escapeHtml(item.loc)}" placeholder="输入新库位">
+                            <button class="small-btn" onclick="updateLoc('${item.systemId}')">修改库位</button>
+                        </div>
+                    </div>
+                `;
+            });
+            resultContainer.innerHTML = html;
 
-            try {
-                const response = await fetch(WEB_APP_URL + '?action=getData');
-                const textResult = await response.text();
-                let inventoryData;
-                try {
-                    inventoryData = JSON.parse(textResult);
-                } catch (e) {
-                    throw new Error("后台返回的数据格式错误");
-                }
-
-                let cleanText = text.replace(/\s+/g, ' ');
-                let parsedTasks = [];
-                let seenPairs = new Set();
-
-                let segments = cleanText.split(/ACCORDING\s+TO/gi);
-
-                for (let i = 0; i < segments.length - 1; i++) {
-                    let currentPart = segments[i];
-                    let nextPart = segments[i + 1];
-
-                    let nextTokens = nextPart.trim().split(' ');
-                    let targetWarehouse = nextTokens[0] ? nextTokens[0].toUpperCase() : '';
-
-                    let regex = /([A-Z0-9\-]+)\s+([A-Z0-9\-]+)/gi;
-                    let match;
-                    while ((match = regex.exec(currentPart)) !== null) {
-                        let container = match[1].toUpperCase();
-                        let warehouse = match[2].toUpperCase();
-
-                        let ignoreWords = ['ACCORDING', 'TO', '出库', 'SHEILA', 'SAMUEL', 'SMART'];
-                        if (ignoreWords.includes(container) || ignoreWords.includes(warehouse)) continue;
-                        if (container.length < 3) continue;
-
-                        let key = `${container}_${warehouse}_${targetWarehouse}`;
-                        if (!seenPairs.has(key)) {
-                            seenPairs.add(key);
-                            parsedTasks.push({
-                                container: container,
-                                oldWarehouse: warehouse, 
-                                newWarehouse: targetWarehouse
-                            });
-                        }
-                    }
-
-                    nextTokens.shift();
-                    segments[i + 1] = nextTokens.join(' ');
-                }
-
-                resultTitle.innerText = `转仓任务（${parsedTasks.length}条）`;
-
-                if (parsedTasks.length === 0) {
-                    resultList.innerHTML = `<div class="no-result">未能解析出有效的转仓任务，请检查输入格式</div>`;
-                    transferBtn.disabled = false;
-                    transferBtn.innerText = '转化任务';
-                    return;
-                }
-
-                let html = '';
-                parsedTasks.forEach(task => {
-                    let matches = inventoryData.filter(item => {
-                        let itemContainer = String(item.container || '').toUpperCase();
-                        let itemCode = String(item.code || '').toUpperCase();
-                        let balance = Number(item.balance);
-
-                        if (isNaN(balance) || balance <= 0) return false;
-
-                        let matchC = itemContainer.includes(task.container);
-                        let matchW = itemCode === task.oldWarehouse || itemCode.startsWith(task.oldWarehouse + ' ');
-
-                        return matchC && matchW;
-                    });
-
-                    let suffix = '';
-                    if (matches.length > 0) {
-                        let parts = matches.map(m => {
-                            let loc = m.loc || '';
-                            let qty = m.balance || 0;
-                            return `${loc}，${qty}`;
-                        });
-                        suffix = `（${parts.join('；')}）`;
-                    }
-
-                    let lineText = `${task.container} ${task.newWarehouse} FROM ${task.oldWarehouse}${suffix}`;
-                    html += `<div class="transfer-row"><span>${lineText}</span></div>`;
-                });
-
-                resultList.innerHTML = html;
-
-            } catch (error) {
-                console.error("转化出错:", error);
-                alert("转化时发生错误: " + error.message);
-                resultList.innerHTML = `<div class="no-result" style="color: red;">转化失败: ${error.message}</div>`;
-            } finally {
-                transferBtn.disabled = false;
-                transferBtn.innerText = '转化任务';
-            }
+        } class catch (err) {
+            errorMsg.textContent = '查询出错: ' + err.message;
+        } finally {
+            searchBtn.disabled = false;
+            loading.style.display = 'none';
         }
-    </script>
+    }
+
+    // 更新库位函数
+    async function updateLoc(systemId) {
+        const newLocInput = document.getElementById(`new-loc-${systemId}`);
+        const newLoc = newLocInput.value.trim();
+        
+        if (!newLoc) {
+            alert('请输入要修改的新库位！');
+            return;
+        }
+
+        if (!confirm(`确定要将该条记录的库位修改为 "${newLoc}" 吗？`)) {
+            return;
+        }
+
+        try {
+            const updateUrl = `${WEB_APP_URL}?action=updateLoc&systemId=${encodeURIComponent(systemId)}&newLoc=${encodeURIComponent(newLoc)}`;
+            const response = await fetch(updateUrl);
+            const resData = await response.json();
+
+            if (resData.status === 'success') {
+                alert('库位修改成功！');
+                document.getElementById(`loc-text-${systemId}`).textContent = newLoc;
+            } else {
+                alert('修改失败: ' + (resData.message || '未知错误'));
+            }
+        } catch (err) {
+            alert('网络请求失败: ' + err.message);
+        }
+    }
+
+    // 简单的防XSS转义
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+             .replace(/&/g, "&amp;")
+             .replace(/</g, "&lt;")
+             .replace(/>/g, "&gt;")
+             .replace(/"/g, "&quot;")
+             .replace(/[']/g, "&#039;");
+    }
+</script>
 
 </body>
 </html>
