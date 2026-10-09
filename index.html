@@ -734,10 +734,6 @@
                     let matches = inventoryData.filter(item => {
                         let itemContainer = String(item.container || '').toUpperCase();
                         let itemCode = String(item.code || '').toUpperCase();
-                        let balance = Number(item.balance);
-
-                        if (isNaN(balance) || balance <= 0) return false;
-
                         let matchC = itemContainer.includes(task.container);
                         let matchW = itemCode === task.oldWarehouse || itemCode.startsWith(task.oldWarehouse + ' ');
 
